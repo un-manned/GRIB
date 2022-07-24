@@ -1,0 +1,21 @@
+{
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "files.associations": {
+        "chaos.h": "c",
+        "ss_oled.h": "c",
+        "random": "c",
+        "optional": "cpp",
+        "ostream": "cpp",
+        "system_error": "cpp",
+        "array": "cpp",
+        "functional": "cpp",
+        "tuple": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp",
+        "cmath": "c",
+        "math.h": "c",
+        "string": "cpp",
+        "string_view": "cpp",
+        "ranges": "cpp"
+    }
+}
