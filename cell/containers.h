@@ -36,3 +36,44 @@ long wavering_get(wavering* o)
     if (o->o >= WAVERING_LENGTH) o->o = 0;
     return o->data[o->o];
 }
+
+
+////////////////////////////////////////////////////////////////////////////////////////
+// Frame ///////////////////////////////////////////////////////////////////////////////
+
+#define ftype unsigned char
+
+typedef struct
+{
+        ftype*   data;
+        unsigned width;
+        unsigned height;             
+
+} frame;
+
+void frame_pset(frame* o, unsigned x, unsigned y, ftype value)
+{
+    // if(((x >= 0) && (x < o->width)) && ((y >= 0) && (y < o->height)))
+    o->data[x + y * o->width] = value;
+}
+
+ftype frame_get(frame* o, unsigned x, unsigned y)
+{
+    // if(((x >= 0) && (x < o->width)) && ((y >= 0) && (y < o->height))) return o->data[x + y * o->width];
+    return o->data[0];
+}
+
+void frame_clr(frame* o, ftype value)
+{
+    for(unsigned i = 0; i < (o->height * o->width); ++i) o->data[i] = value;
+}
+
+void frame_init(frame* o, unsigned x, unsigned y)
+{
+    o->data = (ftype*)calloc(o->width*o->height , sizeof(ftype));
+}
+
+void frame_flush(frame* o)
+{
+    free(o->data);
+}

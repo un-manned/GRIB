@@ -5,13 +5,14 @@
 
 typedef struct ssoleds
 {
-uint8_t oled_addr; // requested address or 0xff for automatic detection
-uint8_t oled_wrap, oled_flip, oled_type;
-uint8_t *ucScreen;
-uint8_t iCursorX, iCursorY;
-uint8_t oled_x, oled_y;
-int iScreenOffset;
-BBI2C bbi2c;
+    uint8_t oled_addr; // requested address or 0xff for automatic detection
+    uint8_t oled_wrap, oled_flip, oled_type;
+    uint8_t *ucScreen;
+    uint8_t iCursorX, iCursorY;
+    uint8_t oled_x, oled_y;
+    int iScreenOffset;
+    BBI2C bbi2c;
+
 } SSOLED;
 // Make the Linux library interface C instead of C++
 #if defined(_LINUX_) && defined(__cplusplus)
@@ -112,21 +113,7 @@ void oledSetCursor(SSOLED *pOLED, int x, int y);
 // Turn text wrap on or off for the oldWriteString() function
 //
 void oledSetTextWrap(SSOLED *pOLED, int bWrap);
-//
-// Draw a string of normal (8x8), small (6x8) or large (16x32) characters
-// At the given col+row with the given scroll offset. The scroll offset allows you to
-// horizontally scroll text which does not fit on the width of the display. The offset
-// represents the pixels to skip when drawing the text. An offset of 0 starts at the beginning
-// of the text.
-// The system remembers where the last text was written (the cursor position)
-// To continue writing from the last position, set the x,y values to -1
-// The text can optionally wrap around to the next line by calling oledSetTextWrap(true);
-// otherwise text which would go off the right edge will not be drawn and the cursor will
-// be left "off screen" until set to a new position explicitly
-//
-//  Returns 0 for success, -1 for invalid parameter
-//
-int oledWriteString(SSOLED *pOLED, int iScrollX, int x, int y, char *szMsg, int iSize, int bInvert, int bRender);
+
 //
 // Fill the frame buffer with a byte pattern
 // e.g. all off (0x00) or all on (0xff)
@@ -141,6 +128,13 @@ void oledFill(SSOLED *pOLED, unsigned char ucData, int bRender);
 // otherwise, new pixels will erase old pixels within the same byte
 //
 int oledSetPixel(SSOLED *pOLED, int x, int y, unsigned char ucColor, int bRender);
+int oledPSET(SSOLED *pOLED, int x, int y, unsigned char ucColor);
+void oledWriteFlashBlock(SSOLED *pOLED, uint8_t *s, int iLen);
+
+int oledWriteString(SSOLED *pOLED, int iScroll, int x, int y, char *szMsg, int iSize, int bInvert, int bRender);
+
+// void oledWriteDataBlock(SSOLED *pOLED, unsigned char *ucBuf, int iLen, int bRender);
+
 //
 // Dump an entire custom buffer to the display
 // useful for custom animation effects
@@ -154,10 +148,6 @@ void oledDumpBuffer(SSOLED *pOLED, uint8_t *pBuffer);
 //
 int oledDrawGFX(SSOLED *pOLED, uint8_t *pSrc, int iSrcCol, int iSrcRow, int iDestCol, int iDestRow, int iWidth, int iHeight, int iSrcPitch);
 
-//
-// Draw a line between 2 points
-//
-void oledDrawLine(SSOLED *pOLED, int x1, int y1, int x2, int y2, int bRender);
 //
 // Play a frame of animation data
 // The animation data is assumed to be encoded for a full frame of the display
@@ -174,34 +164,7 @@ uint8_t * oledPlayAnimFrame(SSOLED *pOLED, uint8_t *pAnimation, uint8_t *pCurren
 // Returns 0 for success, -1 for invalid parameter
 //
 int oledScrollBuffer(SSOLED *pOLED, int iStartCol, int iEndCol, int iStartRow, int iEndRow, int bUp);
-//
-// Draw a sprite of any size in any position
-// If it goes beyond the left/right or top/bottom edges
-// it's trimmed to show the valid parts
-// This function requires a back buffer to be defined
-// The priority color (0 or 1) determines which color is painted 
-// when a 1 is encountered in the source image.
-// e.g. when 0, the input bitmap acts like a mask to clear
-// the destination where bits are set.
-//
-void oledDrawSprite(SSOLED *pOLED, uint8_t *pSprite, int cx, int cy, int iPitch, int x, int y, uint8_t iPriority);
-//
-// Draw a 16x16 tile in any of 4 rotated positions
-// Assumes input image is laid out like "normal" graphics with
-// the MSB on the left and 2 bytes per line
-// On AVR, the source image is assumed to be in FLASH memory
-// The function can draw the tile on byte boundaries, so the x value
-// can be from 0 to 112 and y can be from 0 to 6
-//
-void oledDrawTile(SSOLED *pOLED, const uint8_t *pTile, int x, int y, int iRotation, int bInvert, int bRender);
-//
-// Draw an outline or filled ellipse
-//
-void oledEllipse(SSOLED *pOLED, int iCenterX, int iCenterY, int32_t iRadiusX, int32_t iRadiusY, uint8_t ucColor, uint8_t bFilled);
-//
-// Draw an outline or filled rectangle
-//
-void oledRectangle(SSOLED *pOLED, int x1, int y1, int x2, int y2, uint8_t ucColor, uint8_t bFilled);
+
 
 #if defined(_LINUX_) && defined(__cplusplus)
 }

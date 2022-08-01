@@ -19,18 +19,18 @@ typedef struct
     
 } roessler;
 
-roessler __roessler = 
+void roessler_init(roessler* o)
 {
-    .x = 1.0f,
-	.y = 1.0f,
-	.z = 1.0f,
-	.a = 0.2f,
-	.b = 0.2f,
-	.c = 5.7f,
-	.t = 0.01f
-};
+    o->x = 1.0f;
+	o->y = 1.0f;
+	o->z = 1.0f;
+	o->a = 0.2f;
+	o->b = 0.2f;
+	o->c = 5.7f;
+	o->t = 0.01f;
+}
 
-void fRoessler(roessler* o)
+void roessler_process(roessler* o)
 {
     o->x += (-o->y - o->z) * o->t;
     o->y += (o->x + o->a * o->y) * o->t;
@@ -48,15 +48,15 @@ typedef struct
 
 } hopf;
 
-hopf __hopf = 
+void hopf_init(hopf* o)
 {
-    .x = 0.01f,
-	.y = 0.01f,
-	.p = 0.11f,
-    .t = 0.01f
-};
+    o->x = 0.01f;
+	o->y = 0.01f;
+	o->p = 0.11f;
+    o->t = 0.01f;
+}
 
-void fHopf(hopf* o)
+void hopf_process(hopf* o)
 {
     o->x += o->t * ( -o->y + o->x * (o->p - (o->x*o->x + o->y*o->y)));
     o->y += o->t * (  o->x + o->y * (o->p - (o->x*o->x + o->y*o->y)));
@@ -76,18 +76,18 @@ typedef struct
    
 } helmholz;
 
-helmholz __helmholz = 
+void helmholz_init(helmholz* o)
 {
-    .x = 0.1f,
-	.y = 0.1f,
-    .z = 0.1f,
+    o->x = 0.1f;
+	o->y = 0.1f;
+    o->z = 0.1f;
 
-	.gamma = 5.11f,
-	.delta = 0.55f,
-    .t     = 0.01f
-};
+	o->gamma = 5.11f;
+	o->delta = 0.55f;
+    o->t     = 0.01f;
+}
 
-void fHelmholz(helmholz* o)
+void helmholz_process(helmholz* o)
 {
     o->x += o->t * o->y;
     o->y += o->t * o->gamma * o->z;
@@ -106,15 +106,15 @@ typedef struct
 
 } sprott;
 
-sprott __sprott =
+void sprott_init(sprott *o)
 {
-    .x = 0.1f,
-    .y = 0.1f,
-    .z = 0.1f,
-    .t = 0.1f
-};
+    o->x = 0.1f;
+    o->y = 0.1f;
+    o->z = 0.1f;
+    o->t = 0.1f;
+}
 
-void fSprott(sprott *o)
+void sprott_process(sprott *o)
 {   
     o->x += o->t * o->y;
     o->y += o->t * (o->y * o->z - o->x);
@@ -133,16 +133,16 @@ typedef struct
 
 } linz;
 
-linz __linz = 
+void linz_init(linz* o)
 {
-    .x = 0.1f,
-	.y = 0.1f,
-    .z = 0.1f,
-    .a = 0.5f,
-    .t = 0.1f
-};
+    o->x = 0.1f;
+	o->y = 0.1f;
+    o->z = 0.1f;
+    o->a = 0.5f;
+    o->t = 0.1f;
+}
 
-void fLinz(linz* o)
+void linz_process(linz* o)
 {
     o->x += o->t * (o->y + o->z);
     o->y += o->t * (o->y * o->a - o->x);

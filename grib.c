@@ -1,25 +1,32 @@
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
 #include <stdio.h>
 #include <math.h>
 #include "hardware/pll.h"
 #include "hardware/gpio.h"
 #include "hardware/clocks.h"
-#include "hardware/structs/clocks.h"
+// #include "hardware/structs/clocks.h"
 #include "pico/stdlib.h"
 #include "pico/audio_i2s.h"
 #include "pico/multicore.h"
 #include "4051.h"
 #include "hardware/adc.h"
-#include "cell/chaos.h"
+// #include "cell/chaos.h"
 #include "cell/utility.h"
 #include "cell/delay.h"
 #include "cell/containers.h"
 #include "cell/oscillator.h"
 #include "pico-ss-oled/include/ss_oled.h"
-
+////////////////////////////////////////////////////////////////////////////////////
+// Globals /////////////////////////////////////////////////////////////////////////
 #define WAVE_TABLE_LENGTH   2048
 #define SAMPLES_PER_BUFFER  1156
 #define SAMPLE_RATE         44100
-
+#define LAG4051             10
+////////////////////////////////////////////////////////////////////////////////////
+#define BUTTON_C 17
+#define BUTTON_B 18
+#define BUTTON_A 19
 
 #define DIN_PIN 2
 #define BCLK_PIN 0
@@ -31,23 +38,22 @@
 
 #define OLED_WIDTH 128
 #define OLED_HEIGHT 64
-
+////////////////////////////////////////////////////////////////////////////////////
 
 SSOLED oled;
 static wavering cbuffer;
-
 static const uint32_t PIN_DCDC_PSM_CTRL = 23;
-
 static int16_t wave_table   [WAVE_TABLE_LENGTH];
-
 audio_buffer_pool_t *ap;
 
-uint32_t step = 0x200000;
-uint32_t pos = 0;
-
+// uint32_t step = 0x200000;
+uint32_t step = 0x1A000;
+uint32_t pos  = 0;
 const uint32_t pos_max = 0x10000 * WAVE_TABLE_LENGTH;
 uint vol = 0x5F;
 
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
 audio_buffer_pool_t *init_audio() 
 {
     static audio_format_t audio_format = 
@@ -102,51 +108,52 @@ audio_buffer_pool_t *init_audio()
     return producer_pool;
 }
 
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+
 static inline uint32_t _millis(void)
 {
 	return to_ms_since_boot(get_absolute_time());
 }
 
-
-
-void bresenham(int x0, int y0, int x1, int y1) 
-{
-    int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
-    int dy = abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
-    int err = (dx > dy ? dx : -dy) / 2;
-
-    while (oledSetPixel(&oled, x0, y0, 0xFF, 1), x0 != x1 || y0 != y1) 
-    {
-        int e2 = err;
-        if (e2 > -dx) { err -= dy; x0 += sx; }
-        if (e2 <  dy) { err += dx; y0 += sy; }
-    }
-}
-
-// Core 1 interrupt Handler
+static frame canvas;
+////////////////////////////////////////////////////////////////////////////////////
+// Core 1 interrupt Handler ////////////////////////////////////////////////////////
 void core1_interrupt_handler() 
 {
     // Receive Raw Value, Convert and Print Temperature Value
     float k = SAMPLES_PER_BUFFER/OLED_WIDTH;
+    frame_init(&canvas, 128, 64);
+    // 
+    // 
     while (multicore_fifo_rvalid())
     {
-        // char buffer[10];
-        // int ret = snprintf(buffer, sizeof buffer, "%f", F);
         uint16_t raw = multicore_fifo_pop_blocking();   
-        if(raw == 1)   
-        {
-            oledFill(&oled, 0,1);
-            for(int i = 0; i < OLED_WIDTH; i++)
-            {
-                oledSetPixel(&oled, i, wavering_get(&cbuffer)/0x80FFFF+OLED_HEIGHT/2, 0xFF, 1);
-            }   
-            // oledWriteString(&oled, 0,0,0, buffer, FONT_8x8, 0, 1);
-        }
+        // if(raw == 1)   
+        // {
+        //     oledFill(&oled, 0,1);
+        //     for(int i = 0; i < OLED_WIDTH; i++)
+        //     {
+        //         oledPSET(&oled, i, wavering_get(&cbuffer)/0x80FFFF+OLED_HEIGHT/2, 0xFF);
+        //     }   
+        // }
+        oledWriteString(&oled, 0, 0, 0, "ABCDEFGHIJKLM", 1, 0, 1);
+        oledWriteString(&oled, 0, 0, 1, "NOPQRSTUVWXYZ", 1, 0, 1);
+        oledWriteString(&oled, 0, 0, 2, "[0123456789].,", 1, 0, 1);
+        oledWriteString(&oled, 0, 0, 3, "MESSAGE4", 1, 0, 1);
+        oledWriteString(&oled, 0, 0, 4, "MESSAGE5", 1, 0, 1);
+        oledWriteString(&oled, 0, 0, 5, "MESSAGE6", 1, 0, 1);
+        oledWriteString(&oled, 0, 0, 6, "MESSAGE7", 1, 0, 1);
+        oledWriteString(&oled, 0, 0, 7, "MESSAGE8", 1, 0, 1);
+        oledWriteString(&oled, 0, 0, 8, "MESSAGE9", 1, 0, 1);
+
+
     }
     multicore_fifo_clear_irq(); // Clear interrupt
 }
 
-// Core 1 Main Code
+////////////////////////////////////////////////////////////////////////////////////
+// Core 1 Main Code ////////////////////////////////////////////////////////////////
 void core1_entry() 
 {
     // Configure Core 1 Interrupt
@@ -160,18 +167,31 @@ void core1_entry()
     }
 }
 
-
-
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
 int main() 
 {
+    
     stdio_init_all();
     multicore_launch_core1(core1_entry);
 
     wavering_init(&cbuffer);
 
+    gpio_init(BUTTON_A);
+    gpio_init(BUTTON_B);
+    gpio_init(BUTTON_C);
+
     gpio_init(20);
     gpio_init(21);
     gpio_init(22);
+
+    gpio_set_dir(BUTTON_A, GPIO_IN);
+    gpio_set_dir(BUTTON_B, GPIO_IN);
+    gpio_set_dir(BUTTON_C, GPIO_IN);
+
+    // gpio_pull_up(BUTTON_A);
+    // gpio_pull_up(BUTTON_B);
+    // gpio_pull_up(BUTTON_C);
 
     gpio_set_dir(20, GPIO_OUT);
     gpio_set_dir(21, GPIO_OUT);
@@ -181,15 +201,13 @@ int main()
 
     oledFill(&oled, 0,1);
     oledSetContrast(&oled, 127);
-    // oledWriteString(&oled, 0,0,0,(char *)"**************** ", FONT_8x8, 0, 1);
 
     adc_init();
-    // Make sure GPIO is high-impedance, no pullups etc
     adc_gpio_init(26);
     adc_gpio_init(27);
     adc_gpio_init(28);
-
-    // Set PLL_USB 96MHz
+    ////////////////////////////////////////////////////////////////////////////////////
+    // Set PLL_USB 96MHz ///////////////////////////////////////////////////////////////
     pll_init(pll_usb, 1, 1536 * MHZ, 4, 4);
     clock_configure(clk_usb,
         0,
@@ -212,27 +230,29 @@ int main()
     stdio_init_all();
     ////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////
-
-
     // DCDC PSM control
     // 0: PFM mode (best efficiency)
     // 1: PWM mode (improved ripple)
     gpio_init(PIN_DCDC_PSM_CTRL);
     gpio_set_dir(PIN_DCDC_PSM_CTRL, GPIO_OUT);
     gpio_put(PIN_DCDC_PSM_CTRL, 1); // PWM mode for less Audio noise
-
+    ////////////////////////////////////////////////////////////////////////////////////
     for (int i = 0; i < WAVE_TABLE_LENGTH; i++) 
     {
         wave_table[i] = 32767 * cosf(i * 2 * (float) (M_PI / WAVE_TABLE_LENGTH));
     }
-
     ap = init_audio();
+    ////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////
     ulong departed = 0;
-    psf PSF[4];
-    psf_init(&PSF[0], 2, SAMPLE_RATE);
-    psf_init(&PSF[1], 2, SAMPLE_RATE);
-    psf_init(&PSF[2], 2, SAMPLE_RATE);
-    psf_init(&PSF[3], 2, SAMPLE_RATE);
+    #define NPSF 4
+    psf PSF[NPSF];
+    for(int i = 0; i < NPSF; i++)
+    {
+        psf_init(&PSF[i], 2, SAMPLE_RATE);
+    }
+
     delay DD;
     delay_init(&DD);
 
@@ -243,19 +263,30 @@ int main()
     static oscillator osc;
     oscillator_init(&osc);
 
-    snh SNH;
-    snh_init(&SNH);
+    // snh SNH;
+    // snh_init(&SNH);
 
     static limiter lim;
     limiter_init(&lim, 0.5f, 3.0f, .5f);
+
+    bool state_a;
+    bool state_b;
+    bool state_c;
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////
     while (true) 
     {
         departed++;
-        
+        if(gpio_get(BUTTON_A)) state_a = true; else state_a = false;
+        if(gpio_get(BUTTON_B)) state_b = true; else state_b = false;
+        if(gpio_get(BUTTON_C)) state_c = true; else state_c = false;
+
+
+
         adc_select_input(2);
 
-        set4051(2);
-        sleep_ms(1);
+        set4051_2(LAG4051);
         int F = adc_read();
 
         // if(departed >= F/100) 
@@ -266,87 +297,54 @@ int main()
         //     departed = 0;
         // }
         // step = psf_process(&PSF[0], F)*2000 + 0x1A000;
-        step = 0x1A000;
+        // step = 0x1A000;
         // step =  note*128 + 0x1A000;
         // osc.fm = note*0.0001f;
 
-        set4051(4);
+        set4051_4(LAG4051);
         sleep_ms(1);
         DD.time     = adc_read()/4096.0f;
-        // set4051(7);
-        // sleep_ms(1);
-        // 
         
-        set4051(6);
-        sleep_ms(1);
+        set4051_6(LAG4051);
         float T = adc_read();
-        //DD.time     = T/262144.0f;
         DD.amount   = T/4096.0f*0.9f;
         DD.feedback = T/4096.0f*0.9f;
 
-        set4051(0);
-        sleep_ms(1);
+        set4051_0(LAG4051);
         float cutoff = psf_process(&PSF[1], adc_read() + 0.0f);
 
-        set4051(3);
-        sleep_ms(1);
+        set4051_3(LAG4051);
         float Q = (1.1f - psf_process(&PSF[2], adc_read())/4096.0f*1.05f);
 
-        set4051(5);
-        sleep_ms(1);
+        set4051_5(LAG4051);
         float PW = psf_process(&PSF[3], adc_read()/4096.0f);
 
-        ltfskf_init(&FF, cutoff, Q);
-
-        set4051(7);
-        sleep_ms(1);
-        // float snhtime = adc_read()*10.0f;
+        set4051_7(LAG4051);
         osc.warp = adc_read()/4096.0f*0.9f;
         
-        
-        set4051(1);
-        sleep_ms(1);
-        int snh_amount = adc_read()/2048.0f;
+        set4051_1(LAG4051);
+        // int snh_amount = adc_read()/2048.0f;
+        // float fm = adc_read()/4096.0f;
+        set4051_4(LAG4051);
 
 
-        // D = adc_read();
-        float fm = adc_read()/4096.0f;
-        set4051(4);
-        sleep_ms(1);
-        __helmholz.t = (float)adc_read()/100000.0f + 0.00001f;
-        // set4051(2);
-        // float amp = adc_read()*4;
-        
-        // set_delta(&osc, 220);
-        //form[1](&osc);
         osc.delta = TAO/WAVE_TABLE_LENGTH;
         osc.eax   = PI;
         osc.amplitude = 0.5f;
         osc.pwm = (PW - 0.5f) * TAO;
         osc.phase = 0.0f;
 
-        // step *= snh_process(&SNH, out, snhtime)
+        ltfskf_init(&FF, cutoff, Q);
+
         for (int i = 0; i < WAVE_TABLE_LENGTH; i++) 
         {
-            // fHelmholz(&__helmholz);
-            // DD.time = __helmholz.y * 0.1f;
-            // fSprott(&__sprott);
-            // fm *= __sprott.y;
-            // wave_table[i] = 32767 * (ltoskf_process(&FF, cosf(i * 2 * (float) (M_PI / WAVE_TABLE_LENGTH))));
-            // osc.fm = __helmholz.y * fm;
-            
             form[3](&osc);
             float out = osc.out*0.5f;
-
             out = ltfskf_process(&FF, out);
-            out = delay_process(&DD, out);
-            
+            // out = delay_process(&DD, out);
             out = limit(&lim, out);
             out = dcb(out);
-            
-            
-            osc.fm = snh_process(&SNH, out, F)*snh_amount;
-            // out = ltfskf_process(&FF, out);
+            // osc.fm = snh_process(&SNH, out, F)*snh_amount;
             wave_table[i] = 16384 * out;
         }
 
@@ -354,6 +352,7 @@ int main()
         multicore_fifo_push_blocking(raw);
     }
     delay_clr(&DD);
+    // frame_flush(&canvas);
     return 0;
 }
 
