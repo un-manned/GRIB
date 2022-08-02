@@ -17,12 +17,14 @@
 #include "cell/containers.h"
 #include "cell/oscillator.h"
 #include "pico-ss-oled/include/ss_oled.h"
+#include "cell/sequencer.h"
+#include "cell/envelope.h"
 ////////////////////////////////////////////////////////////////////////////////////
 // Globals /////////////////////////////////////////////////////////////////////////
 #define WAVE_TABLE_LENGTH   2048
 #define SAMPLES_PER_BUFFER  1156
 #define SAMPLE_RATE         44100
-#define LAG4051             10
+#define LAG4051             1
 ////////////////////////////////////////////////////////////////////////////////////
 #define BUTTON_C 17
 #define BUTTON_B 18
@@ -46,11 +48,7 @@ static const uint32_t PIN_DCDC_PSM_CTRL = 23;
 static int16_t wave_table   [WAVE_TABLE_LENGTH];
 audio_buffer_pool_t *ap;
 
-// uint32_t step = 0x200000;
-uint32_t step = 0x1A000;
-uint32_t pos  = 0;
-const uint32_t pos_max = 0x10000 * WAVE_TABLE_LENGTH;
-uint vol = 0x5F;
+
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
@@ -117,6 +115,7 @@ static inline uint32_t _millis(void)
 }
 
 static frame canvas;
+static float amp = 1.0f;
 ////////////////////////////////////////////////////////////////////////////////////
 // Core 1 interrupt Handler ////////////////////////////////////////////////////////
 void core1_interrupt_handler() 
@@ -128,6 +127,8 @@ void core1_interrupt_handler()
     // 
     while (multicore_fifo_rvalid())
     {
+        char buf[10];
+        snprintf(buf, sizeof buf, "%f", amp);
         uint16_t raw = multicore_fifo_pop_blocking();   
         // if(raw == 1)   
         // {
@@ -139,14 +140,8 @@ void core1_interrupt_handler()
         // }
         oledWriteString(&oled, 0, 0, 0, "ABCDEFGHIJKLM", 1, 0, 1);
         oledWriteString(&oled, 0, 0, 1, "NOPQRSTUVWXYZ", 1, 0, 1);
-        oledWriteString(&oled, 0, 0, 2, "[0123456789].,", 1, 0, 1);
-        oledWriteString(&oled, 0, 0, 3, "MESSAGE4", 1, 0, 1);
-        oledWriteString(&oled, 0, 0, 4, "MESSAGE5", 1, 0, 1);
-        oledWriteString(&oled, 0, 0, 5, "MESSAGE6", 1, 0, 1);
-        oledWriteString(&oled, 0, 0, 6, "MESSAGE7", 1, 0, 1);
-        oledWriteString(&oled, 0, 0, 7, "MESSAGE8", 1, 0, 1);
-        oledWriteString(&oled, 0, 0, 8, "MESSAGE9", 1, 0, 1);
-
+        oledWriteString(&oled, 0, 0, 2, "[0.123456789]", 1, 1, 1);
+        oledWriteString(&oled, 0, 0, 3, buf, 1, 0, 1);
 
     }
     multicore_fifo_clear_irq(); // Clear interrupt
@@ -269,6 +264,14 @@ int main()
     static limiter lim;
     limiter_init(&lim, 0.5f, 3.0f, .5f);
 
+    static sequencer sq;
+    init_sequence(&sq, 1);
+    genRand(&sq);
+
+    // envelope ar;
+    // ar.a[0] = 1.0f;
+    // ar.a[0] = 0.0f;
+
     bool state_a;
     bool state_b;
     bool state_c;
@@ -282,77 +285,63 @@ int main()
         if(gpio_get(BUTTON_B)) state_b = true; else state_b = false;
         if(gpio_get(BUTTON_C)) state_c = true; else state_c = false;
 
-
-
+        genRand(&sq);
+        init_sequence(&sq, adc_read());
+        ////////////////////////////////////////////////////////////////////////////////////
+        // 4051 ////////////////////////////////////////////////////////////////////////////
         adc_select_input(2);
+        set4051_0(LAG4051);
+        
+
+        set4051_1(LAG4051);
+        float a = (adc_read()-580)/3516.0f;
+        amp = a*a;
 
         set4051_2(LAG4051);
         int F = adc_read();
 
-        // if(departed >= F/100) 
-        // {
-        //     if(note == 1) note = C3N1(F);
-        //     else note = C3N1(note);
-
-        //     departed = 0;
-        // }
-        // step = psf_process(&PSF[0], F)*2000 + 0x1A000;
-        // step = 0x1A000;
-        // step =  note*128 + 0x1A000;
-        // osc.fm = note*0.0001f;
+        set4051_3(LAG4051);
+        float Q = (1.1f - psf_process(&PSF[1], adc_read())/4096.0f*1.05f);
 
         set4051_4(LAG4051);
-        sleep_ms(1);
-        DD.time     = adc_read()/4096.0f;
-        
-        set4051_6(LAG4051);
-        float T = adc_read();
-        DD.amount   = T/4096.0f*0.9f;
-        DD.feedback = T/4096.0f*0.9f;
-
-        set4051_0(LAG4051);
-        float cutoff = psf_process(&PSF[1], adc_read() + 0.0f);
-
-        set4051_3(LAG4051);
-        float Q = (1.1f - psf_process(&PSF[2], adc_read())/4096.0f*1.05f);
+        float pw = psf_process(&PSF[2], adc_read()/4096.0f);
 
         set4051_5(LAG4051);
-        float PW = psf_process(&PSF[3], adc_read()/4096.0f);
+        
+
+        set4051_6(LAG4051);
+        float freq = psf_process(&PSF[3], adc_read());
 
         set4051_7(LAG4051);
-        osc.warp = adc_read()/4096.0f*0.9f;
+        float cutoff = psf_process(&PSF[0], adc_read());
+        // osc.warp = adc_read()/4096.0f*0.9f;
+        ////////////////////////////////////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////////////////////////////////////
         
-        set4051_1(LAG4051);
-        // int snh_amount = adc_read()/2048.0f;
-        // float fm = adc_read()/4096.0f;
-        set4051_4(LAG4051);
+        osc.eax = PI;
+        osc.amplitude = 1.0f;
+        osc.pwm = (pw - 0.5f) * TAO;
 
-
-        osc.delta = TAO/WAVE_TABLE_LENGTH;
-        osc.eax   = PI;
-        osc.amplitude = 0.5f;
-        osc.pwm = (PW - 0.5f) * TAO;
-        osc.phase = 0.0f;
+        set_delta(&osc, freq);
 
         ltfskf_init(&FF, cutoff, Q);
 
         for (int i = 0; i < WAVE_TABLE_LENGTH; i++) 
         {
+
             form[3](&osc);
             float out = osc.out*0.5f;
             out = ltfskf_process(&FF, out);
-            // out = delay_process(&DD, out);
             out = limit(&lim, out);
-            out = dcb(out);
-            // osc.fm = snh_process(&SNH, out, F)*snh_amount;
-            wave_table[i] = 16384 * out;
+            out = dcb(out) * amp;
+
+            wave_table[i] = 32767.0f * out;
         }
 
         uint16_t raw = 1; //adc_read();
         multicore_fifo_push_blocking(raw);
     }
     delay_clr(&DD);
-    // frame_flush(&canvas);
     return 0;
 }
 
@@ -363,13 +352,9 @@ void i2s_callback_func()
     int32_t *samples = (int32_t *) buffer->buffer->bytes;
     for (uint i = 0; i < buffer->max_sample_count; i++) 
     {
-        samples[i*2+0] = (vol * wave_table[pos >> 16u]) << 8u;;  // L
-        samples[i*2+1] = (vol * wave_table[pos >> 16u]) << 8u;;  // R
-
+        samples[i*2+0] = wave_table[i]<<16u;  // L
+        samples[i*2+1] = wave_table[i]<<16u;  // R
         if(i%0xF==0) wavering_set(&cbuffer, samples[i*2]);
-
-        pos += step;
-        if (pos >= pos_max) pos -= pos_max;
     }
     buffer->sample_count = buffer->max_sample_count;
     give_audio_buffer(ap, buffer);

@@ -3,9 +3,9 @@
 
 typedef struct 
 {
-    int   t[NSTAGES];     // Timings
-    float a[NSTAGES];     // Amplitude levels
-    float f[NSTAGES];     // Coefficients
+    int   t[NSTAGES]; // Timings
+    float a[NSTAGES]; // Amplitude levels
+    float f[NSTAGES]; // Coefficients
     int   stage;
     int   depated;
     float feed;
